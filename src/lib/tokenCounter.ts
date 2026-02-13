@@ -9,7 +9,7 @@ export async function countTokens(text: string, apiKey?: string): Promise<{ coun
             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
             const result = await model.countTokens(text);
             return { count: result.totalTokens, isExact: true };
-        } catch (error: any) {
+        } catch (error) {
             console.error("Failed to count tokens with API:", error);
             // Fallback only if API fails, but log clearly.
             return { count: estimateTokens(text), isExact: false };
