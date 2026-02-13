@@ -65,17 +65,91 @@ export const generatePDFReport = (files: ReportData[], overallStats: OverallStat
     doc.setFont("helvetica", "bold");
     doc.setTextColor(37, 99, 235); // blue-600
 
+    // ... (previous code) ...
+
     doc.text(files.length.toString(), col1, yPos);
     doc.text(overallStats.totalTokens.toLocaleString(), col2, yPos);
     doc.text(overallStats.totalChars.toLocaleString(), col3, yPos);
 
-    // Usage Bar logic illustration in text
-    yPos += 25;
-    const percentage = (overallStats.totalTokens / 1000000) * 100;
+    yPos += 20;
+
+    // --- PDF Charts (Manually drawn) ---
+
+    // 1. Context Window Usage (Pie/Donut)
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text("Context Window Usage", 14, yPos);
+
+    const usagePercent = overallStats.totalTokens / 1000000;
+    const pieX = 50;
+    const pieY = yPos + 35;
+    const radius = 25;
+
+    // Background Circle (Gray)
+    doc.setFillColor(226, 232, 240);
+    doc.circle(pieX, pieY, radius, 'F');
+
+    // Usage wedge
+    if (usagePercent > 0) {
+        doc.setFillColor(37, 99, 235); // Blue
+        // Simplified wedge drawing for PDF (using lines for approximation if sector not supported well in all versions, but let's try to simulate)
+        // Since jsPDF doesn't have a simple sector command in standard build without adding plugins, we'll draw angles.
+        // Actually, let's stick to a simple bar for "Usage" to be safe and robust, and a Pie for file distribution if possible.
+        // Drawing a real pie chart in raw jsPDF is complex without plugins. 
+        // Let's implement a nice "Progress Bar" for Context Window and a Bar Chart for Files.
+    }
+
+    // REVISED PLAN: Better visuals that are robust in jsPDF core.
+
+    // A. Context Window Progress Bar (Visual)
+    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(14, yPos + 5, pageWidth - 28, 10, 2, 2, 'F'); // Track
+
+    const barWidth = (pageWidth - 28) * Math.min(usagePercent, 1);
+    doc.setFillColor(usagePercent > 1 ? 239 : 37, usagePercent > 1 ? 68 : 99, usagePercent > 1 ? 68 : 235); // Red if > 100%, else Blue
+    doc.roundedRect(14, yPos + 5, barWidth, 10, 2, 2, 'F'); // Progress
+
     doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // slate-500
-    doc.setFont("helvetica", "bold");
-    doc.text(`Context Window Usage (${percentage.toFixed(2)}% of 1M limit)`, 14, yPos);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${(usagePercent * 100).toFixed(2)}% of 1,000,000 Tokens`, 14, yPos + 22);
+
+    yPos += 40;
+
+    // B. File Token Distribution (Bar Chart)
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text("Top Files by Token Count", 14, yPos);
+    yPos += 10;
+
+    const maxTokens = Math.max(...files.map(f => f.tokenCount), 1);
+    const chartHeight = 60;
+    const chartWidth = pageWidth - 40;
+    const barMaxHeight = 50;
+
+    // Sort files by tokens for the chart (top 5)
+    const topFiles = [...files].sort((a, b) => b.tokenCount - a.tokenCount).slice(0, 5);
+    const barStep = chartWidth / (topFiles.length || 1);
+    const barW = Math.min(30, barStep - 10);
+
+    topFiles.forEach((file, i) => {
+        const h = (file.tokenCount / maxTokens) * barMaxHeight;
+        const x = 20 + i * barStep;
+        const y = yPos + barMaxHeight - h;
+
+        // Bar
+        doc.setFillColor(59, 130, 246); // Blue-500
+        doc.rect(x, y, barW, h, 'F');
+
+        // Label
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        const name = file.fileName.length > 8 ? file.fileName.substring(0, 6) + '..' : file.fileName;
+        doc.text(name, x + barW / 2, yPos + barMaxHeight + 5, { align: 'center' });
+        doc.text(file.tokenCount.toLocaleString(), x + barW / 2, y - 2, { align: 'center' });
+    });
+
+    yPos += chartHeight + 10;
 
     // Table
     const tableData = files.map(file => [
@@ -86,7 +160,7 @@ export const generatePDFReport = (files: ReportData[], overallStats: OverallStat
     ]);
 
     autoTable(doc, {
-        startY: yPos + 5,
+        startY: yPos,
         head: [["File Name", "Characters", "Tokens", "Method"]],
         body: tableData,
         theme: 'grid',

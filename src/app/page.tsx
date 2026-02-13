@@ -9,6 +9,7 @@ import { countTokens } from "@/lib/tokenCounter";
 import { generatePDFReport } from "@/lib/reportGenerator";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Github, RefreshCw, FileDown } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils"; // Added for className utility
 
@@ -17,10 +18,15 @@ export default function Home() {
   const [results, setResults] = React.useState<Array<{ fileName: string, charCount: number, tokenCount: number, isExact: boolean, isLoading: boolean, error?: string }>>([]);
   const [apiKey, setApiKey] = React.useState<string>("");
   const [overallStats, setOverallStats] = React.useState({ totalTokens: 0, totalChars: 0 });
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   const handleFilesSelect = async (selectedFiles: File[]) => {
     setFiles(selectedFiles);
-    // Initialize results with loading state
+    setIsProcessing(true);
+
+    // Initialize results with looking state
     const initialResults = selectedFiles.map(f => ({
       fileName: f.name,
       charCount: 0,
@@ -30,40 +36,42 @@ export default function Home() {
     }));
     setResults(initialResults);
 
-    // Process files
-    const newResults: typeof results = [...initialResults];
-    let totalTok = 0;
-    let totalChar = 0;
+    // Parallel Processing
+    try {
+      const processedResults = await Promise.all(selectedFiles.map(async (file) => {
+        try {
+          const text = await extractText(file);
+          const { count, isExact } = await countTokens(text, apiKey);
+          return {
+            fileName: file.name,
+            charCount: text.length,
+            tokenCount: count,
+            isExact,
+            isLoading: false
+          };
+        } catch (err) {
+          console.error("Error processing file:", file.name, err);
+          return {
+            fileName: file.name,
+            charCount: 0,
+            tokenCount: 0,
+            isExact: false,
+            isLoading: false,
+            error: "Failed to process"
+          };
+        }
+      }));
 
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const file = selectedFiles[i];
-      try {
-        const text = await extractText(file);
-        const { count, isExact } = await countTokens(text, apiKey);
+      setResults(processedResults);
 
-        newResults[i] = {
-          fileName: file.name,
-          charCount: text.length,
-          tokenCount: count,
-          isExact,
-          isLoading: false
-        };
-        totalTok += count;
-        totalChar += text.length;
-      } catch (err: any) {
-        console.error(err);
-        newResults[i] = {
-          fileName: file.name,
-          charCount: 0,
-          tokenCount: 0,
-          isExact: false,
-          isLoading: false,
-          error: "Failed to process"
-        };
-      }
-      // Update state progressively
-      setResults([...newResults]);
+      const totalTok = processedResults.reduce((acc, curr) => acc + curr.tokenCount, 0);
+      const totalChar = processedResults.reduce((acc, curr) => acc + curr.charCount, 0);
       setOverallStats({ totalTokens: totalTok, totalChars: totalChar });
+
+    } catch (error) {
+      console.error("Batch processing error", error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -71,26 +79,36 @@ export default function Home() {
     setApiKey(key);
   };
 
-  // Re-calc if key changes - simpler to just ask user to re-process for now or we need to store text in memory
-  // For batch, storing all text might be heavy. Let's rely on user re-uploading or add a "Re-analyze" button if files are present.
-  // Actually, we can keep the files in memory and re-trigger.
   React.useEffect(() => {
     if (files.length > 0 && apiKey) {
       handleFilesSelect(files);
     }
-  }, [apiKey]); // Be careful with loops, handleFilesSelect depends on files/apiKey. 
-  // Better: separate the processing logic. But for now this is fine if we debounce or user interaction drives it.
-  // Actually, let's just let the user re-drop or rely on the initial API key presence.
+  }, [apiKey]);
 
   const MAX_TOKENS = 1000000;
   const percentage = Math.min((overallStats.totalTokens / MAX_TOKENS) * 100, 100);
   const isOverLimit = overallStats.totalTokens > MAX_TOKENS;
 
+  // Prepare Pie Data (Group small values)
+  const pieData = React.useMemo(() => {
+    const sorted = [...results].sort((a, b) => b.tokenCount - a.tokenCount);
+    if (sorted.length <= 5) return sorted;
+
+    const top5 = sorted.slice(0, 5);
+    const others = sorted.slice(5);
+    const othersTokenCount = others.reduce((acc, curr) => acc + curr.tokenCount, 0);
+
+    if (othersTokenCount > 0) {
+      return [...top5, { fileName: "Others", tokenCount: othersTokenCount, charCount: 0, isExact: false, isLoading: false }];
+    }
+    return top5;
+  }, [results]);
+
   return (
     <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100 via-zinc-50 to-zinc-50 dark:from-blue-900/20 dark:via-zinc-950 dark:to-zinc-950"></div>
 
-      <main className="container mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+      <main className="container mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -109,11 +127,12 @@ export default function Home() {
           </p>
         </motion.div>
 
-        <div className="mx-auto max-w-xl space-y-8">
+        <div className="mx-auto space-y-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
+            className="max-w-xl mx-auto"
           >
             <APIKeyInput onKeyChange={handleKeyChange} />
           </motion.div>
@@ -122,27 +141,49 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
+            className="max-w-xl mx-auto"
           >
-            <FileDropzone onFilesSelect={handleFilesSelect} isLoading={results.some(r => r.isLoading)} />
+            <FileDropzone onFilesSelect={handleFilesSelect} isLoading={isProcessing} />
           </motion.div>
 
-          {results.length > 0 && (
+          <AnimatePresence>
+            {isProcessing && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex flex-col items-center justify-center p-12"
+              >
+                <div className="relative h-16 w-16">
+                  <div className="absolute inset-0 animate-ping rounded-full bg-blue-400 opacity-20"></div>
+                  <div className="relative flex h-full w-full items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                    <RefreshCw className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+                <p className="mt-4 animate-pulse text-lg font-medium text-zinc-600 dark:text-zinc-400">
+                  Tokenating...
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!isProcessing && results.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="space-y-6"
+              className="space-y-8"
             >
               {/* Overall Stats */}
-              <div className="rounded-3xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-900/30 dark:bg-blue-900/10">
-                <h3 className="mb-4 text-lg font-bold text-blue-900 dark:text-blue-100">Total Consumption</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm font-medium">
+              <div className="rounded-3xl border border-blue-200 bg-blue-50 p-8 dark:border-blue-900/30 dark:bg-blue-900/10">
+                <h3 className="mb-4 text-2xl font-bold text-blue-900 dark:text-blue-100">Total Consumption</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between text-lg font-medium">
                     <span className="text-zinc-500">Context Usage ({results.length} files)</span>
                     <span className={isOverLimit ? "text-red-500" : "text-zinc-900 dark:text-zinc-100"}>
                       {percentage.toFixed(1)}% of 1M limit
                     </span>
                   </div>
-                  <div className="h-4 w-full overflow-hidden rounded-full bg-white dark:bg-zinc-800">
+                  <div className="h-6 w-full overflow-hidden rounded-full bg-white dark:bg-zinc-800">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${percentage}%` }}
@@ -153,26 +194,104 @@ export default function Home() {
                       )}
                     />
                   </div>
-                  <div className="mt-2 flex justify-between text-sm text-zinc-500">
+                  <div className="mt-2 flex justify-between text-base text-zinc-500">
                     <span>{new Intl.NumberFormat("en-US").format(overallStats.totalTokens)} Tokens</span>
                     <span>{new Intl.NumberFormat("en-US").format(overallStats.totalChars)} Chars</span>
                   </div>
                 </div>
               </div>
 
-              {/* Individual Files */}
-              <div className="space-y-4">
-                {results.map((result, index) => (
-                  <TokenStats
-                    key={index}
-                    charCount={result.charCount}
-                    tokenCount={result.tokenCount}
-                    isExact={result.isExact}
-                    fileName={result.fileName}
-                    isLoading={result.isLoading}
-                    error={result.error}
-                  />
-                ))}
+              {/* Charts Section */}
+              <div className="grid gap-8 grid-cols-1">
+                {/* Pie Chart - Distribution */}
+                <div className="rounded-3xl border border-blue-200 bg-white p-8 shadow-sm dark:border-blue-900/30 dark:bg-zinc-900">
+                  <h3 className="mb-6 text-center text-xl font-bold text-zinc-700 dark:text-zinc-200">Token Distribution</h3>
+                  <div className="h-96 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          dataKey="tokenCount"
+                          nameKey="fileName"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={120}
+                          fill="#8884d8"
+                          label={({ fileName, percent }) => `${fileName.substring(0, 10)}${fileName.length > 10 ? '...' : ''} ${((percent || 0) * 100).toFixed(0)}%`}
+                          labelLine={true}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={[
+                              "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"
+                            ][index % 6]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#f3f4f6" }}
+                          itemStyle={{ color: "#f3f4f6" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Bar Chart - Tokens vs Chars */}
+                <div className="rounded-3xl border border-blue-200 bg-white p-8 shadow-sm dark:border-blue-900/30 dark:bg-zinc-900">
+                  <h3 className="mb-6 text-center text-xl font-bold text-zinc-700 dark:text-zinc-200">File Comparison</h3>
+                  <div className="h-96 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={results.slice(0, 10)}>
+                        <XAxis dataKey="fileName" tickFormatter={(val) => val.length > 8 ? `${val.substring(0, 8)}...` : val} stroke="#9ca3af" fontSize={12} />
+                        <YAxis stroke="#9ca3af" fontSize={12} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#f3f4f6" }}
+                          cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="tokenCount" name="Tokens" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="charCount" name="Chars" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Collapsible Detailed Stats */}
+              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <button
+                  onClick={() => setIsDetailsOpen(!isDetailsOpen)}
+                  className="flex w-full items-center justify-between text-left"
+                >
+                  <h3 className="text-xl font-bold text-zinc-700 dark:text-zinc-200">Detailed File Stats</h3>
+                  <div className="rounded-full bg-zinc-100 p-2 text-zinc-500 dark:bg-zinc-800">
+                    {isDetailsOpen ? <div className="h-5 w-5">▲</div> : <div className="h-5 w-5">▼</div>}
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {isDetailsOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-4 pt-6">
+                        {results.map((result, index) => (
+                          <TokenStats
+                            key={index}
+                            charCount={result.charCount}
+                            tokenCount={result.tokenCount}
+                            isExact={result.isExact}
+                            fileName={result.fileName}
+                            isLoading={result.isLoading}
+                            error={result.error}
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
 
