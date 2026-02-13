@@ -92,16 +92,27 @@ export default function Home() {
   // Prepare Pie Data (Group small values)
   const pieData = React.useMemo(() => {
     const sorted = [...results].sort((a, b) => b.tokenCount - a.tokenCount);
-    if (sorted.length <= 5) return sorted;
+    if (sorted.length === 0) return [];
 
-    const top5 = sorted.slice(0, 5);
-    const others = sorted.slice(5);
-    const othersTokenCount = others.reduce((acc, curr) => acc + curr.tokenCount, 0);
-
-    if (othersTokenCount > 0) {
-      return [...top5, { fileName: "Others", tokenCount: othersTokenCount, charCount: 0, isExact: false, isLoading: false }];
+    let chartData = [];
+    if (sorted.length <= 5) {
+      chartData = sorted;
+    } else {
+      const top5 = sorted.slice(0, 5);
+      const others = sorted.slice(5);
+      const othersTokenCount = others.reduce((acc, curr) => acc + curr.tokenCount, 0);
+      chartData = [...top5];
+      if (othersTokenCount > 0) {
+        chartData.push({ fileName: "Others", tokenCount: othersTokenCount, charCount: 0, isExact: false, isLoading: false });
+      }
     }
-    return top5;
+
+    // Add percentage to name for Legend
+    const total = chartData.reduce((acc, curr) => acc + curr.tokenCount, 0) || 1;
+    return chartData.map(item => ({
+      ...item,
+      legendLabel: `${item.fileName.length > 20 ? item.fileName.substring(0, 20) + '...' : item.fileName} (${((item.tokenCount / total) * 100).toFixed(0)}%)`
+    }));
   }, [results]);
 
   return (
@@ -212,13 +223,15 @@ export default function Home() {
                         <Pie
                           data={pieData}
                           dataKey="tokenCount"
-                          nameKey="fileName"
+                          nameKey="legendLabel"
                           cx="50%"
                           cy="50%"
-                          outerRadius={120}
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={5}
                           fill="#8884d8"
-                          label={({ fileName, percent }) => `${fileName.substring(0, 10)}${fileName.length > 10 ? '...' : ''} ${((percent || 0) * 100).toFixed(0)}%`}
-                          labelLine={true}
+                          label={false}
+                          labelLine={false}
                         >
                           {pieData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={[
@@ -229,6 +242,12 @@ export default function Home() {
                         <Tooltip
                           contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#f3f4f6" }}
                           itemStyle={{ color: "#f3f4f6" }}
+                        />
+                        <Legend
+                          layout="vertical"
+                          verticalAlign="middle"
+                          align="right"
+                          wrapperStyle={{ paddingLeft: "20px" }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
