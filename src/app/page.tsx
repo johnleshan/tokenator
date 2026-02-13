@@ -119,7 +119,7 @@ export default function Home() {
     <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100 via-zinc-50 to-zinc-50 dark:from-blue-900/20 dark:via-zinc-950 dark:to-zinc-950"></div>
 
-      <main className="container mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <main className="container mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -130,7 +130,7 @@ export default function Home() {
               <Zap className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="mb-4 text-4xl font-extrabold tracking-tight sm:text-5xl">
+          <h1 className="mb-4 text-3xl font-extrabold tracking-tight sm:text-5xl">
             Tokenator
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
@@ -185,7 +185,7 @@ export default function Home() {
               className="space-y-8"
             >
               {/* Overall Stats */}
-              <div className="rounded-3xl border border-blue-200 bg-blue-50 p-8 dark:border-blue-900/30 dark:bg-blue-900/10">
+              <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4 sm:p-8 dark:border-blue-900/30 dark:bg-blue-900/10">
                 <h3 className="mb-4 text-2xl font-bold text-blue-900 dark:text-blue-100">Total Consumption</h3>
                 <div className="space-y-4">
                   <div className="flex justify-between text-lg font-medium">
@@ -215,9 +215,9 @@ export default function Home() {
               {/* Charts Section */}
               <div className="grid gap-8 grid-cols-1">
                 {/* Pie Chart - Distribution */}
-                <div className="rounded-3xl border border-blue-200 bg-white p-8 shadow-sm dark:border-blue-900/30 dark:bg-zinc-900">
+                <div className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-8 shadow-sm dark:border-blue-900/30 dark:bg-zinc-900">
                   <h3 className="mb-6 text-center text-xl font-bold text-zinc-700 dark:text-zinc-200">Token Distribution</h3>
-                  <div className="h-96 w-full">
+                  <div className="h-80 sm:h-96 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -255,12 +255,12 @@ export default function Home() {
                 </div>
 
                 {/* Bar Chart - Tokens vs Chars */}
-                <div className="rounded-3xl border border-blue-200 bg-white p-8 shadow-sm dark:border-blue-900/30 dark:bg-zinc-900">
+                <div className="rounded-3xl border border-blue-200 bg-white p-4 sm:p-8 shadow-sm dark:border-blue-900/30 dark:bg-zinc-900">
                   <h3 className="mb-6 text-center text-xl font-bold text-zinc-700 dark:text-zinc-200">File Comparison</h3>
-                  <div className="h-96 w-full">
+                  <div className="h-64 sm:h-96 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={results.slice(0, 10)}>
-                        <XAxis dataKey="fileName" tickFormatter={(val) => val.length > 8 ? `${val.substring(0, 8)}...` : val} stroke="#9ca3af" fontSize={12} />
+                        <XAxis dataKey="fileName" tickFormatter={(val) => val.length > 5 ? `${val.substring(0, 5)}...` : val} stroke="#9ca3af" fontSize={12} />
                         <YAxis stroke="#9ca3af" fontSize={12} />
                         <Tooltip
                           contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#f3f4f6" }}

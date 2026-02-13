@@ -67,9 +67,9 @@ export function TokenStats({
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full space-y-6 rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+            className="w-full space-y-6 rounded-3xl border border-zinc-200 bg-white p-4 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
         >
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col items-start gap-4 justify-between sm:flex-row sm:items-center sm:gap-0">
                 <div>
                     <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                         Analysis Results
