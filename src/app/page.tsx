@@ -21,6 +21,22 @@ export default function Home() {
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
 
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    // Initial check
+    checkMobile();
+
+    // Event listener
+    window.addEventListener('resize', checkMobile);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleFilesSelect = async (selectedFiles: File[]) => {
     setFiles(selectedFiles);
@@ -244,10 +260,10 @@ export default function Home() {
                           itemStyle={{ color: "#f3f4f6" }}
                         />
                         <Legend
-                          layout="vertical"
-                          verticalAlign="middle"
-                          align="right"
-                          wrapperStyle={{ paddingLeft: "20px" }}
+                          layout={isMobile ? "horizontal" : "vertical"}
+                          verticalAlign={isMobile ? "bottom" : "middle"}
+                          align={isMobile ? "center" : "right"}
+                          wrapperStyle={isMobile ? { paddingTop: "20px" } : { paddingLeft: "20px" }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
